@@ -1,14 +1,15 @@
-import { fileURLToPath, pathToFileURL } from 'url';
-import config from 'config';
-import path from 'path';
 import * as initializer from './initializer/index.js';
 import * as renamer from './renamer/index.js';
 import * as services from '../../src/app/services/index.js';
 
+import { fileURLToPath, pathToFileURL } from 'url';
+
 import Git from '../../src/app/history/git.js';
 import { InaccessibleContentError } from '../../src/app/errors.js';
+import config from 'config';
 import filter from '../../src/app/filter/index.js';
 import { loadFile } from './utils.js';
+import path from 'path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -38,22 +39,34 @@ let history;
   const sourceRepo = new Git(SNAPSHOTS_SOURCE_PATH);
 
   console.log('Waiting for git log… (this can take a while)');
-  const commits = (await sourceRepo.log(['--stat=4096'])).sort(
-    (a, b) => new Date(a.date) - new Date(b.date)
-  );
-  console.log(`Source repo contains ${commits.length} commits.\n`);
+  console.time('retrieve all logs');
+  const commitsUnsorted = await sourceRepo.log(['--stat=4096']);
+  console.log(`Source repo contains ${commitsUnsorted.length} commits.\n`);
+  console.timeEnd('retrieve all logs');
 
+  console.time('sort all logs');
+  const commits = commitsUnsorted.sort((a, b) => new Date(a.date) - new Date(b.date));
+  console.timeEnd('sort all logs');
+
+  console.time('initialize');
   if (initialize) {
     const targetRepo = await initializer.initTargetRepo(VERSIONS_TARGET_PATH);
     const [readmeCommit] = commits;
     await initializer.initReadmeAndLicense(targetRepo, VERSIONS_TARGET_PATH, readmeCommit.date);
   }
+  console.timeEnd('initialize');
 
+  console.time('history init');
   history = await import(pathToFileURL(path.resolve(ROOT_PATH, 'src/app/history/index.js'))); // history module needs the target repo to be initiliazed. So loads it after target repo initialization.
   await history.init();
+  console.timeEnd('history init');
 
+  console.time('filter commits');
   const filteredCommits = commits.filter(({ message }) =>
-    message.match(/^(Start tracking|Update)/));
+    message.match(/^(Start tracking|Update)/)
+  );
+  console.timeEnd('filter commits');
+  console.log(`Source repo contains ${filteredCommits.length} filtered commits.\n`);
 
   /* eslint-disable no-await-in-loop */
   /* eslint-disable no-continue */
