@@ -3,6 +3,7 @@ import TurndownService from 'turndown';
 import ciceroMark from '@accordproject/markdown-cicero';
 import jsdom from 'jsdom';
 import mardownPdf from '@accordproject/markdown-pdf';
+import prettier from 'prettier';
 import turndownPluginGithubFlavouredMarkdown from 'joplin-turndown-plugin-gfm';
 import url from 'url';
 
@@ -36,7 +37,7 @@ export function cleanSnapshotHTML(content) {
   if (typeof content !== 'string') {
     return content;
   }
-  const cleanedContent = content
+  let cleanedContent = content
     .replace(/href="((.*?)\/email-protection#)[0-9a-fA-F]+"/gim, 'href="$1"') // Windstream and Schockwave.com
     .replace(/data-cfemail="[0-9a-fA-F]+"/gim, 'data-cfemail=""') // Windstream and Schockwave.com
     // beacon numbers are always changing numbers
@@ -45,6 +46,7 @@ export function cleanSnapshotHTML(content) {
     .replace(/nonce="(.*?)"/gim, 'nonce=""') // OkCupid
     // replace empty styles tags
     .replace(/<style (.*?)><\/style>/gim, ''); // OkCupid
+  cleanedContent = prettier.format(cleanedContent, { parser: 'html' });
   return cleanedContent;
 }
 
